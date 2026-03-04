@@ -1,62 +1,34 @@
+//! # Wispy Fog
+//!
+//! An agentic system using the Gemini API for content generation.
+//!
+//! This application provides a command-line interface to interact with
+//! Google's Gemini models, allowing users to input prompts and receive
+//! generated responses.
+
+mod config;
+mod app;
 pub mod providers;
 
-use providers::llm_provider::LlmProvider;
-use providers::gemini_adapter::GeminiAdapter;
-use clap::{Parser, ValueEnum};
+use app::{App, Args};
+use clap::Parser;
 
-#[derive(ValueEnum, Clone, Debug)]
-enum ModelChoice {
-    /// Gemini 3.0 Flash (faster, lower latency)
-    Flash,
-    /// Gemini 3.1 Pro (more capable)
-    Pro,
-}
-
-#[derive(Parser, Debug)]
-#[command(name = "Wispy Fog")]
-#[command(about = "An agentic system using Gemini API", long_about = None)]
-struct Args {
-    /// Model to use for generation
-    #[arg(short, long, value_enum, default_value = "flash")]
-    model: ModelChoice,
-}
-
+/// The main entry point of the application.
+///
+/// Parses command-line arguments, loads configuration, and runs the application loop.
 #[tokio::main]
 async fn main() {
-    dotenv::dotenv().ok();
-    
     let args = Args::parse();
-    
-    let api_key = std::env::var("GEMINI_API_KEY")
-        .expect("GEMINI_API_KEY environment variable not set");
-    
-    let adapter: Box<dyn LlmProvider> = match args.model {
-        ModelChoice::Flash => Box::new(GeminiAdapter::new(api_key, "gemini-3-flash-preview".to_string())),
-        ModelChoice::Pro => Box::new(GeminiAdapter::new(api_key, "gemini-3.1-pro-preview".to_string())),
-    };
-    
+
+    let config = config::Config::from_env()
+        .expect("Failed to load configuration");
+
     println!("Using model: {:?}", args.model);
 
-    println!("Enter a prompt (or 'exit' to quit):");
+    let app = App::new(config, args.model);
 
-    loop {
-        let mut input = String::new();
-        println!("prompt: ");
-        
-        std::io::stdin().read_line(&mut input).expect("Failed to read line");
-        let input = input.trim();
-        if input.eq_ignore_ascii_case("exit") {
-            break;
-        }
-
-        let response = query_llm(&adapter, input).await;
-        match response {
-            Ok(ans) => println!("Response: {}", ans),
-            Err(e) => println!("Error: {:?}", e),
-        }
+    if let Err(e) = app.run().await {
+        eprintln!("Application error: {:?}", e);
+        std::process::exit(1);
     }
-}
-
-async fn query_llm(provider: &Box<dyn LlmProvider>, prompt: &str) -> Result<String, providers::llm_provider::AgentError> {
-    provider.generate_content(prompt).await
 }

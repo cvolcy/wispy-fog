@@ -1,7 +1,12 @@
+//! Gemini API adapter implementation.
+//!
+//! Provides an implementation of the `LlmProvider` trait for Google's Gemini API.
+
 use crate::providers::llm_provider::{AgentError, LlmProvider};
 use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 
+/// Adapter for interacting with the Gemini API.
 pub struct GeminiAdapter {
     api_key: String,
     model_name: String,
@@ -9,6 +14,12 @@ pub struct GeminiAdapter {
 }
 
 impl GeminiAdapter {
+    /// Creates a new GeminiAdapter instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `api_key` - The API key for accessing the Gemini API.
+    /// * `model_name` - The name of the Gemini model to use.
     pub fn new(api_key: String, model_name: String) -> Self {
         GeminiAdapter {
             api_key,
@@ -55,26 +66,31 @@ impl LlmProvider for GeminiAdapter {
     }
 }
 
+/// Request structure for the Gemini API.
 #[derive(Serialize)]
 struct GeminiRequest {
     contents: Vec<Content>,
 }
 
+/// Content structure for the request.
 #[derive(Serialize, Deserialize)]
 struct Content {
     parts: Vec<Part>,
 }
 
+/// Part structure containing the text.
 #[derive(Serialize, Deserialize)]
 struct Part {
     text: String,
 }
 
+/// Response structure from the Gemini API.
 #[derive(Deserialize, Serialize)]
 struct GeminiResponse {
     candidates: Option<Vec<Candidate>>,
 }
 
+/// Candidate structure in the response.
 #[derive(Deserialize, Serialize)]
 struct Candidate {
     content: Content,
