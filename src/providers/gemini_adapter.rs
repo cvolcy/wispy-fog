@@ -1,10 +1,11 @@
 use crate::providers::llm_provider::{AgentError, LlmProvider};
 use serde::{Deserialize, Serialize};
+use async_trait::async_trait;
 
 pub struct GeminiAdapter {
     api_key: String,
     model_name: String,
-    client: reqwest::blocking::Client,
+    client: reqwest::Client,
 }
 
 impl GeminiAdapter {
@@ -12,13 +13,14 @@ impl GeminiAdapter {
         GeminiAdapter {
             api_key,
             model_name: "gemini-3-flash-preview".to_string(),
-            client: reqwest::blocking::Client::new(),
+            client: reqwest::Client::new(),
         }
     }
 }
 
+#[async_trait]
 impl LlmProvider for GeminiAdapter {
-    fn generate_content(&self, prompt: &str) -> Result<String, AgentError> {
+    async fn generate_content(&self, prompt: &str) -> Result<String, AgentError> {
         let url = format!(
             "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
             self.model_name, self.api_key
@@ -36,8 +38,10 @@ impl LlmProvider for GeminiAdapter {
             .post(&url)
             .json(&request_body)
             .send()
+            .await
             .map_err(|e| AgentError::GeneralError(format!("Failed to send request: {}", e)))?
             .json::<GeminiResponse>()
+            .await
             .map_err(|e| AgentError::GeneralError(format!("Failed to parse response: {}", e)))?;
 
         if let Some(candidate) = response.candidates.as_ref().and_then(|c| c.iter().next()) {
