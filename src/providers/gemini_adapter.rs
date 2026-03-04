@@ -9,10 +9,10 @@ pub struct GeminiAdapter {
 }
 
 impl GeminiAdapter {
-    pub fn new(api_key: String) -> Self {
+    pub fn new(api_key: String, model_name: String) -> Self {
         GeminiAdapter {
             api_key,
-            model_name: "gemini-3-flash-preview".to_string(),
+            model_name,
             client: reqwest::Client::new(),
         }
     }
