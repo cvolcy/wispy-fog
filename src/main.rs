@@ -10,18 +10,24 @@ async fn main() {
     let api_key = std::env::var("GEMINI_API_KEY")
         .expect("GEMINI_API_KEY environment variable not set");
     
-    let adapter = GeminiAdapter::new(api_key);
+    let adapter = GeminiAdapter::new(api_key, "gemini-3-flash-preview".to_string());
+    println!("Enter a prompt (or 'exit' to quit):");
 
-    let prompt = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "what is 10 + 9".to_string());
+    loop {
+        let mut input = String::new();
+        println!("prompt: ");
+        
+        std::io::stdin().read_line(&mut input).expect("Failed to read line");
+        let input = input.trim();
+        if input.eq_ignore_ascii_case("exit") {
+            break;
+        }
 
-    println!("Prompt: {}", prompt);
-
-    let anwser = query_llm(&adapter, &prompt).await;
-    match anwser {
-        Ok(response) => println!("Response: {}", response),
-        Err(e) => println!("Error: {:?}", e),
+        let response = query_llm(&adapter, input).await;
+        match response {
+            Ok(ans) => println!("Response: {}", ans),
+            Err(e) => println!("Error: {:?}", e),
+        }
     }
 }
 
