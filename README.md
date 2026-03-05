@@ -6,13 +6,15 @@ An agentic system using Google's Gemini API for content generation. This CLI app
 
 - **Multiple Model Support**: Choose between Gemini 3.0 Flash (fast, low latency) and Gemini 3.1 Pro (more capable)
 - **Interactive CLI**: Simple prompt-response interface
+- **Conversation Logging**: Requests and responses are saved to `transcript.jsonl` in JSONL format for later inspection
+- **Inspect Mode**: `--inspect` command shows a colored, human-readable view of the transcript file
 - **Modular Architecture**: Extensible provider system for easy addition of new LLM backends
-- **Configuration Management**: Environment-based configuration with dotenv support
+- **Configuration Management**: Environment-based configuration with dotenv support, including custom `OUTPUT_DIR` for transcripts
 - **Async Processing**: Built with Tokio for efficient asynchronous operations
 
 ## Architecture
 
-The application follows a clean, modular architecture:
+The application follows a clean, modular architecture and retains a flat project structure:
 
 ```
 src/
@@ -58,21 +60,30 @@ src/
 
 ### Configuration
 
-Create a `.env` file in the project root with your Gemini API key:
+The application supports two environment variables:
+
+* `GEMINI_API_KEY` – your Gemini API key
+* `OUTPUT_DIR` – directory where transcripts and other output files are stored (defaults to project root)
+
+Create a `.env` file in the project root with the settings:
 
 ```env
 GEMINI_API_KEY=your_api_key_here
+OUTPUT_DIR=.
 ```
 
 ### Running the Application
 
 ```bash
-# Use default model (Flash)
+# Use default model (Flash) and record conversation
 ./wispy-fog
 
 # Specify model explicitly
 ./wispy-fog --model pro
 ./wispy-fog --model flash
+
+# Inspect the transcript file in human-readable, colored format
+./wispy-fog --inspect
 
 # Get help
 ./wispy-fog --help
@@ -95,11 +106,12 @@ prompt: exit
 ### Dependencies
 
 - `reqwest`: HTTP client for API calls
-- `serde`: Serialization/deserialization
+- `serde`/`serde_json`: Serialization/deserialization
 - `tokio`: Async runtime
 - `dotenv`: Environment variable management
 - `async-trait`: Async trait support
 - `clap`: Command-line argument parsing
+- `colored`: ANSI color output for transcript inspection
 
 ### Adding New Providers
 
@@ -149,6 +161,8 @@ cargo check
 
 ## Error Handling
 
+Errors in transcript I/O are surfaced via the same `AgentError` enum; `IoError` covers problems reading or writing the JSONL log.
+
 The application uses a comprehensive error system:
 
 - `GeneralError`: API and processing errors
@@ -159,6 +173,10 @@ Errors are propagated up and displayed to the user with context.
 ## License
 
 This project is licensed under the terms specified in the LICENSE file.
+
+## Transcript Storage
+
+Logs are written to `transcript.jsonl` within `OUTPUT_DIR`. Each entry is a standalone JSON object containing `role`, `parts`, and `timestamp`. The log can be appended to or processed by external tools.
 
 ## Contributing
 
