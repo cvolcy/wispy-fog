@@ -25,6 +25,10 @@ pub struct Args {
     /// Model to use for generation
     #[arg(short, long, value_enum, default_value = "flash")]
     pub model: ModelChoice,
+
+    /// If set, print the transcript.jsonl file to stdout in a readable format and exit
+    #[arg(long)]
+    pub inspect: bool,
 }
 
 /// Main application structure.
@@ -36,8 +40,8 @@ impl App {
     /// Creates a new application instance with the given configuration and model choice.
     pub fn new(config: Config, model: ModelChoice) -> Self {
         let provider: Box<dyn LlmProvider> = match model {
-            ModelChoice::Flash => Box::new(GeminiAdapter::new(config.api_key, GEMINI_FLASH_MODEL.to_string())),
-            ModelChoice::Pro => Box::new(GeminiAdapter::new(config.api_key, GEMINI_PRO_MODEL.to_string())),
+            ModelChoice::Flash => Box::new(GeminiAdapter::new(config.api_key, GEMINI_FLASH_MODEL.to_string(), config.output_dir)),
+            ModelChoice::Pro => Box::new(GeminiAdapter::new(config.api_key, GEMINI_PRO_MODEL.to_string(), config.output_dir)),
         };
 
         App { provider }

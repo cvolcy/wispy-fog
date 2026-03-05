@@ -10,6 +10,7 @@ use std::env;
 pub struct Config {
     /// The API key for accessing the Gemini API.
     pub api_key: String,
+    pub output_dir: String,
 }
 
 impl Config {
@@ -24,6 +25,13 @@ impl Config {
         let api_key = env::var("GEMINI_API_KEY")
             .map_err(|_| "GEMINI_API_KEY environment variable not set".to_string())?;
 
-        Ok(Config { api_key })
+        let output_dir = env::var("OUTPUT_DIR")
+            .unwrap_or_else(|_| "./output".into());
+
+        // Ensure output directory exists
+        std::fs::create_dir_all(&output_dir)
+            .map_err(|e| format!("Failed to create output directory: {}", e))?;
+
+        Ok(Config { api_key, output_dir })
     }
 }

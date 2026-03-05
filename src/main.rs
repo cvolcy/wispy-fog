@@ -9,9 +9,13 @@
 mod config;
 mod app;
 pub mod providers;
+pub mod agents;
 
 use app::{App, Args};
 use clap::Parser;
+
+mod inspect;
+use inspect::inspect_transcript;
 
 /// The main entry point of the application.
 ///
@@ -23,6 +27,11 @@ async fn main() {
     let config = config::Config::from_env()
         .expect("Failed to load configuration");
 
+    if args.inspect {
+        inspect_transcript(&config.output_dir);
+        return;
+    }
+
     println!("Using model: {:?}", args.model);
 
     let app = App::new(config, args.model);
@@ -32,3 +41,4 @@ async fn main() {
         std::process::exit(1);
     }
 }
+
