@@ -3,8 +3,8 @@ use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
-/// Reads the transcript file from the given output directory and prints
-/// a human-readable, colored representation to stdout.
+/// Reads a JSONL transcript file from the given output directory and prints
+/// a human-readable, colored representation of each entry to stdout.
 pub fn inspect_transcript(output_dir: &str) {
     let path = format!("{}/transcript.jsonl", output_dir);
     if !Path::new(&path).exists() {
@@ -25,16 +25,11 @@ pub fn inspect_transcript(output_dir: &str) {
         return;
     }
 
-    let data: Value = match serde_json::from_str(&content) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("Failed to parse transcript JSON: {}", e);
-            return;
+    for line in content.lines() {
+        if line.trim().is_empty() {
+            continue;
         }
-    };
-
-    if let Some(array) = data["contents"].as_array() {
-        for entry in array {
+        if let Ok(entry) = serde_json::from_str::<Value>(line) {
             let role = entry["role"].as_str().unwrap_or("unknown");
             let text = entry["parts"]
                 .get(0)
@@ -50,7 +45,5 @@ pub fn inspect_transcript(output_dir: &str) {
             println!("{}: {}", label, text);
             println!();
         }
-    } else {
-        println!("Transcript has no contents array");
     }
 }

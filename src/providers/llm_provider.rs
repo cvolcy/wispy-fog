@@ -21,64 +21,54 @@ pub trait LlmProvider {
     /// Returns an `AgentError` if content generation fails.
     async fn generate_content(&self, prompt: &str) -> Result<String, AgentError>;
 
-    /// Logs the prompt and response to a transcript file.
-    /// Initializes the file if it doesn't exist and appends entries to the contents array.
+    /// Logs the prompt and response to a transcript file in JSONL format.
+    /// Each call appends two separate JSON objects (user and model) as new lines.
+    /// The file is created if it does not already exist.
     /// # Errors
     ///
-    /// Returns an `AgentError` if reading or writing to the transcript file fails.
+    /// Returns an `AgentError` if writing to the transcript file fails.
     async fn transcript(&self, prompt: LlmMessage, response: LlmMessage, output_dir: String) -> Result<(), AgentError> {
         let path = format!("{}/transcript.jsonl", output_dir);
 
-        // Read existing content or initialize with empty contents array
-        let mut data = if Path::new(&path).exists() {
-            let content = fs::read_to_string(&path)
-                .map_err(|e| AgentError::IoError(format!("Failed to read transcript file: {}", e)))?;
-
-            if content.is_empty() {
-                serde_json::json!({ "contents": [] })
-            } else {
-                serde_json::from_str(&content)
-                    .map_err(|e| AgentError::GeneralError(format!("Failed to parse transcript file: {}", e)))?
-            }
-        } else {
-            serde_json::json!({ "contents": [] })
-        };
-
-        // Append user prompt to contents array
-        data["contents"]
-            .as_array_mut()
-            .ok_or_else(|| AgentError::GeneralError("Invalid transcript structure".to_string()))?
-            .push(serde_json::json!({
-                "role": "user",
-                "parts": [{"text": prompt.text}]
-            }));
-
-        // Append model response to contents array
-        data["contents"]
-            .as_array_mut()
-            .ok_or_else(|| AgentError::GeneralError("Invalid transcript structure".to_string()))?
-            .push(serde_json::json!({
-                "role": "model",
-                "parts": [{"text": response.text}]
-            }));
-
-        // Write updated content back to file
-        let serialized = serde_json::to_string(&data)
-            .map_err(|e| AgentError::GeneralError(format!("Failed to serialize transcript: {}", e)))?;
-
+        // open file for append, create if needed
         let mut file = OpenOptions::new()
             .create(true)
-            .write(true)
-            .truncate(true)
-            .open(path)
+            .append(true)
+            .open(&path)
             .map_err(|e| AgentError::IoError(format!("Failed to open transcript file: {}", e)))?;
 
-        file.write_all(serialized.as_bytes())
-            .map_err(|e| AgentError::IoError(format!("Failed to write transcript file: {}", e)))?;
+        // write user entry
+        let user_line = serde_json::to_string(&serde_json::json!({
+            "role": "user",
+            "parts": [{"text": prompt.text}],
+            "timestamp": prompt.timestamp,
+        }))
+        .map_err(|e| AgentError::GeneralError(format!("Failed to serialize transcript entry: {}", e)))?;
+        file.write_all(user_line.as_bytes())
+            .map_err(|e| AgentError::IoError(format!("Failed to write transcript entry: {}", e)))?;
+        file.write_all(b"\n")
+            .map_err(|e| AgentError::IoError(format!("Failed to write newline: {}", e)))?;
+
+        // write model entry
+        let model_line = serde_json::to_string(&serde_json::json!({
+            "role": "model",
+            "parts": [{"text": response.text}],
+            "timestamp": response.timestamp,
+        }))
+        .map_err(|e| AgentError::GeneralError(format!("Failed to serialize transcript entry: {}", e)))?;
+        file.write_all(model_line.as_bytes())
+            .map_err(|e| AgentError::IoError(format!("Failed to write transcript entry: {}", e)))?;
+        file.write_all(b"\n")
+            .map_err(|e| AgentError::IoError(format!("Failed to write newline: {}", e)))?;
 
         Ok(())
     }
 
+    /// Reads the last `count` entries from a JSONL transcript file, returning
+    /// them as `LlmMessage` structures. Each line of the file is parsed as a
+    /// separate JSON object. The messages are prefixed with their role (e.g.
+    /// "User:" or "Model:") to maintain compatibility with how the history is
+    /// later used.
     async fn get_transcript_history(&self, count: usize, output_dir: String) -> Result<Vec<LlmMessage>, AgentError> {
         let path = format!("{}/transcript.jsonl", output_dir);
 
@@ -89,22 +79,31 @@ pub trait LlmProvider {
         let content = fs::read_to_string(&path)
             .map_err(|e| AgentError::IoError(format!("Failed to read transcript file: {}", e)))?;
 
-        let data: serde_json::Value = serde_json::from_str(&content)
-            .map_err(|e| AgentError::GeneralError(format!("Failed to parse transcript file: {}", e)))?;
-
-        let messages: Vec<LlmMessage> = data["contents"]
-            .as_array()
-            .ok_or_else(|| AgentError::GeneralError("Invalid transcript structure".to_string()))?
-            .iter()
-            .rev()
-            .take(count)
-            .rev()
-            .filter_map(|v| {
-                let text = v["parts"][0]["text"].as_str().map(|s| s.to_string());
+        let mut messages: Vec<LlmMessage> = Vec::new();
+        for line in content.lines().rev() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+                let role = v["role"].as_str().unwrap_or("");
+                let text = v["parts"]
+                    .get(0)
+                    .and_then(|p| p["text"].as_str())
+                    .unwrap_or("")
+                    .to_string();
                 let timestamp = v["timestamp"].as_u64().unwrap_or(0);
-                text.map(|t| LlmMessage { text: t, timestamp })
-            })
-            .collect();
+                let prefixed = match role {
+                    "user" => format!("User: {}", text),
+                    "model" => format!("Model: {}", text),
+                    _ => text,
+                };
+                messages.push(LlmMessage { text: prefixed, timestamp });
+
+                if messages.len() >= count {
+                    break;
+                }
+            }
+        }
 
         Ok(messages)
     }
