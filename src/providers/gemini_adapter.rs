@@ -56,7 +56,7 @@ impl LlmProvider for GeminiAdapter {
             .map_err(|e| AgentError::GeneralError(format!("Failed to parse response: {}", e)))?;
 
         if let Some(candidate) = response.candidates.as_ref().and_then(|c| c.iter().next()) {
-            if let Some(part) = candidate.content.parts.iter().next() {
+            if let Some(part) = candidate.content.parts.first() {
                 return Ok(part.text.clone());
             }
         }
