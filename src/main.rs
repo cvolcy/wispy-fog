@@ -1,44 +1,38 @@
-//! # Wispy Fog
-//!
-//! An agentic system using the Gemini API for content generation.
-//!
-//! This application provides a command-line interface to interact with
-//! Google's Gemini models, allowing users to input prompts and receive
-//! generated responses.
-
-mod config;
-mod app;
-pub mod providers;
-pub mod agents;
-
-use app::{App, Args};
+use std::env;
+use crate::{agents::BasicAgent, config::Args, tools::{EchoTool, ToolRegistry}};
 use clap::Parser;
 
-mod inspect;
-use inspect::inspect_transcript;
+mod agents;
+mod config;
+mod tools;
 
-/// The main entry point of the application.
-///
-/// Parses command-line arguments, loads configuration, and runs the application loop.
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), String> {
+    dotenv::dotenv().ok();
     let args = Args::parse();
 
-    let config = config::Config::from_env()
-        .expect("Failed to load configuration");
+    println!("Starting agent with model: {}", args.model.unwrap_or_default());
+    
+    let api_key = env::var("GEMINI_API_KEY")
+        .map_err(|_| "GEMINI_API_KEY environment variable not set".to_string())?;
 
-    if args.inspect {
-        inspect_transcript(&config.output_dir);
-        return;
+    println!("API Key length: {}", api_key.len());
+
+    let config = config::Config::from_env();
+    println!("config {}", config.model);
+
+    let mut registry = ToolRegistry::new();
+    println!("Registering Tools...");
+    registry.register_tool(Box::new(EchoTool));
+    for tool in registry.get_tools() {
+        println!("Registered tool: {} - {}", tool.name(), tool.description());
     }
 
-    println!("Using model: {:?}", args.model);
+    let agent: BasicAgent = BasicAgent::new(config, registry);
 
-    let app = App::new(config, args.model);
+    let result = agent.run("Hello, world!".to_string()).await;
+    println!("Agent result: {}", result.unwrap_or_else(|e| format!("Error: {}", e)));
 
-    if let Err(e) = app.run().await {
-        eprintln!("Application error: {:?}", e);
-        std::process::exit(1);
-    }
+    Ok(())
 }
 

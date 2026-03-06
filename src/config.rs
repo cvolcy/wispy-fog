@@ -1,37 +1,68 @@
-//! Configuration module for the Wispy Fog application.
-//!
-//! Handles loading and managing application configuration,
-//! primarily environment variables.
-
+use clap::Parser;
 use std::env;
 
-/// Application configuration structure.
-#[derive(Debug)]
+#[derive(Parser, Debug)]
+#[command(name = "Wispy Fog")]
+pub struct Args {
+    #[arg(short, long,
+        help = "Model to use for generation (e.g., 'gemini-flash-001' or 'gemini-pro-001')"
+    )]
+    pub model: Option<String>,
+    #[arg(short, long,
+        help = "Provider to use for generation (e.g., 'gemini')"
+    )]
+    pub provider: Option<String>,
+    #[arg(short, long, help = "API key for the LLM provider")]
+    api_key: Option<String>,
+}
+
 pub struct Config {
-    /// The API key for accessing the Gemini API.
+    pub model: String,
+    pub provider: ModelProvider,
     pub api_key: String,
-    pub output_dir: String,
+}
+
+pub enum ModelProvider {
+    Gemini,
+    // Future providers can be added here
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            model: "gemini-3-flash-preview".to_string(),
+            provider: ModelProvider::Gemini,
+            api_key: String::new(),
+        }
+    }
 }
 
 impl Config {
-    /// Loads configuration from environment variables.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the `GEMINI_API_KEY` environment variable is not set.
-    pub fn from_env() -> Result<Self, String> {
-        dotenv::dotenv().ok();
+    pub fn from_env() -> Self {
+        let _ = dotenv::dotenv();
 
-        let api_key = env::var("GEMINI_API_KEY")
-            .map_err(|_| "GEMINI_API_KEY environment variable not set".to_string())?;
+        let mut config = Config::default();
 
-        let output_dir = env::var("OUTPUT_DIR")
-            .unwrap_or_else(|_| "./output".into());
+        if let Ok(model) = env::var("MODEL") {
+            config.model = model;
+        }
 
-        // Ensure output directory exists
-        std::fs::create_dir_all(&output_dir)
-            .map_err(|e| format!("Failed to create output directory: {}", e))?;
+        if let Ok(provider) = env::var("PROVIDER") {
+            config.provider = match provider.as_str() {
+                "gemini" => ModelProvider::Gemini,
+                _ => ModelProvider::Gemini,
+            };
+        }
 
-        Ok(Config { api_key, output_dir })
+        let env_api_key = match config.provider {
+            ModelProvider::Gemini => "GEMINI_API_KEY",
+            // _ => "API_KEY"
+        };
+
+        if let Ok(api_key) = env::var(env_api_key) {
+            config.api_key = api_key;
+        }
+
+        config
     }
 }
