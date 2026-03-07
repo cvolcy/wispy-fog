@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
 pub struct ToolRegistry {
-    tools: Vec<Box<dyn Tool>>,
+    tools: Vec<Arc<dyn Tool + Send + Sync>>,
 }
 
 impl ToolRegistry {
@@ -7,21 +9,31 @@ impl ToolRegistry {
         Self { tools: Vec::new() }
     }
 
-    pub fn register_tool(&mut self, tool: Box<dyn Tool>) {
-        self.tools.push(tool);
+    pub fn register_tool<T: Tool + Send + Sync + 'static>(&mut self, tool: T) {
+        self.tools.push(Arc::new(tool));
     }
 
-    pub fn get_tools(&self) -> &Vec<Box<dyn Tool>> {
+    /// Returns a slice of registered tools.
+    pub fn tools(&self) -> &[Arc<dyn Tool + Send + Sync>] {
         &self.tools
     }
 }
 
 pub trait Tool {
+    /// Human-readable name suitable for invocation.
     fn name(&self) -> &str;
+
+    /// Brief description to show in help/registration logs.
     fn description(&self) -> &str;
 }
 
 pub struct EchoTool;
+
+impl EchoTool {
+    pub fn new() -> Self {
+        EchoTool
+    }
+}
 
 impl Tool for EchoTool {
     fn name(&self) -> &str {

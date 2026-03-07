@@ -1,37 +1,43 @@
-use std::env;
-use crate::{agents::BasicAgent, config::Args, tools::{EchoTool, ToolRegistry}};
-use clap::Parser;
 
-mod agents;
+use clap::Parser;
+use log::{info, debug};
+
+use crate::{
+    agent::BasicAgent,
+    config::{Args, Config},
+    tools::{EchoTool, ToolRegistry},
+};
+
+use crate::agent::Agent;
+
+mod agent;
 mod config;
 mod tools;
 
 #[tokio::main]
-async fn main() -> Result<(), String> {
+async fn main() -> anyhow::Result<()> {
+    // initialize logger before anything else so early messages are captured
+    env_logger::init();
+
     dotenv::dotenv().ok();
     let args = Args::parse();
 
-    println!("Starting agent with model: {}", args.model.unwrap_or_default());
-    
-    let api_key = env::var("GEMINI_API_KEY")
-        .map_err(|_| "GEMINI_API_KEY environment variable not set".to_string())?;
+    info!("starting up");
+    debug!("parsed cli args: {:?}", args);
 
-    println!("API Key length: {}", api_key.len());
-
-    let config = config::Config::from_env();
-    println!("config {}", config.model);
+    let config = Config::from_args(args);
+    info!("using configuration: model={}, provider={:?}", config.model, config.provider);
 
     let mut registry = ToolRegistry::new();
-    println!("Registering Tools...");
-    registry.register_tool(Box::new(EchoTool));
-    for tool in registry.get_tools() {
-        println!("Registered tool: {} - {}", tool.name(), tool.description());
+    registry.register_tool(EchoTool::new());
+
+    for tool in registry.tools() {
+        info!("registered tool: {} - {}", tool.name(), tool.description());
     }
 
-    let agent: BasicAgent = BasicAgent::new(config, registry);
-
-    let result = agent.run("Hello, world!".to_string()).await;
-    println!("Agent result: {}", result.unwrap_or_else(|e| format!("Error: {}", e)));
+    let history_manager = <BasicAgent as Agent>::get_history_manager(config.history_manager.clone(), config.clone());
+    let mut agent = BasicAgent::new(config, registry, history_manager);
+    agent.run().await?;
 
     Ok(())
 }
