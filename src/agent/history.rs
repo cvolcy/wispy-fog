@@ -5,7 +5,6 @@ use tokio::{fs::{File, OpenOptions}, io::{AsyncBufReadExt, AsyncWriteExt, BufRea
 
 pub trait History {
     async fn add(&self, prompt: Message) -> anyhow::Result<String>;
-    async fn clear(&self) -> anyhow::Result<()>;
     async fn get(&self, count: usize) -> anyhow::Result<Vec<Message>>;
 }
 
@@ -32,11 +31,6 @@ impl History for JSONLHistory {
         file.write_all(b"\n").await?;
 
         Ok(json)
-    }
-
-    async fn clear(&self) -> anyhow::Result<()> {
-        tokio::fs::write(&self.path, b"").await?;
-        Ok(())
     }
 
     async fn get(&self, count: usize) -> anyhow::Result<Vec<Message>> {

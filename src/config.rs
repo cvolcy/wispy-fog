@@ -30,7 +30,7 @@ pub struct Args {
         long,
         help = "kind of history manager to use (e.g., 'jsonl')",
     )]
-    pub history_manager: Option<String>,
+    pub history_type: Option<String>,
 
     #[arg(
         short,
@@ -46,7 +46,7 @@ pub struct Config {
     pub model: String,
     pub provider: ModelProvider,
     pub output_dir: String,
-    pub history_manager: String,
+    pub history_type: HistoryType,
     pub api_key: String,
 }
 
@@ -56,13 +56,18 @@ pub enum ModelProvider {
     // future providers can be added here
 }
 
+#[derive(Debug, Clone)]
+pub enum HistoryType {
+    Jsonl,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             model: "gemini-3-flash-preview".to_string(),
             provider: ModelProvider::Gemini,
             output_dir: "output".to_string(),
-            history_manager: "jsonl".to_string(),
+            history_type: HistoryType::Jsonl,
             api_key: String::new(),
         }
     }
@@ -93,11 +98,16 @@ impl Config {
             cfg.output_dir = output_dir;
         }
 
-        cfg.history_manager = if let Some(history_manager) = args.history_manager {
-            history_manager
-        }
-        else {
-            "jsonl".to_string()
+        cfg.history_type = if let Some(history_type) = args.history_type {
+            match history_type.as_str() {
+                "jsonl" => HistoryType::Jsonl,
+                other => {
+                    log::warn!("unknown history type '{}', defaulting to Jsonl", other);
+                    HistoryType::Jsonl
+                }
+            }
+        } else {
+            HistoryType::Jsonl
         };
 
         if let Some(key) = args.api_key {

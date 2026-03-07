@@ -3,7 +3,7 @@ use clap::Parser;
 use log::{info, debug};
 
 use crate::{
-    agent::BasicAgent,
+    agent::{basic::BasicAgent, history::JSONLHistory},
     config::{Args, Config},
     tools::{EchoTool, ToolRegistry},
 };
@@ -35,8 +35,8 @@ async fn main() -> anyhow::Result<()> {
         info!("registered tool: {} - {}", tool.name(), tool.description());
     }
 
-    let history_manager = <BasicAgent as Agent>::get_history_manager(config.history_manager.clone(), config.clone());
-    let mut agent = BasicAgent::new(config, registry, history_manager);
+    let history_manager = JSONLHistory::new(format!("{}/history.jsonl", config.output_dir));
+    let mut agent = BasicAgent::new(config, history_manager);
     agent.run().await?;
 
     Ok(())
