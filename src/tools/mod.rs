@@ -69,3 +69,21 @@ impl ToolRegistry {
         self.tools.len()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ToolRegistry;
+    use crate::tools::{echo::EchoTool, write_file::WriteFileTool};
+
+    #[test]
+    fn registry_tracks_registered_tools() {
+        let mut registry = ToolRegistry::new();
+        assert_eq!(registry.len(), 0);
+
+        registry.register_tool(EchoTool::new());
+        registry.register_tool(WriteFileTool::new());
+
+        assert_eq!(registry.len(), 2);
+        assert_eq!(registry.tools().len(), 2);
+    }
+}

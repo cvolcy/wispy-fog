@@ -64,3 +64,22 @@ impl Tool for EchoTool {
         Ok(format!("Echo: {}", args.message))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{EchoArgs, EchoTool};
+    use rig::tool::Tool;
+
+    #[tokio::test]
+    async fn echo_tool_returns_prefixed_message() {
+        let tool = EchoTool::new();
+        let result = tool
+            .call(EchoArgs {
+                message: "hello".to_string(),
+            })
+            .await
+            .expect("echo tool failed");
+
+        assert_eq!(result, "Echo: hello");
+    }
+}

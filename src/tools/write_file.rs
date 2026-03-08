@@ -116,3 +116,68 @@ impl Tool for WriteFileTool {
         Ok(format!("successfully wrote to file: {}", args.filename))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{WriteFileArgs, WriteFileTool};
+    use rig::tool::Tool;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_text_path() -> PathBuf {
+        let mut path = std::env::temp_dir();
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos();
+        path.push(format!("wispy_fog_write_file_test_{}.txt", nanos));
+        path
+    }
+
+    #[tokio::test]
+    async fn write_file_tool_writes_content() {
+        let tool = WriteFileTool::new();
+        let path = temp_text_path();
+        let filename = path.to_string_lossy().to_string();
+
+        let result = tool
+            .call(WriteFileArgs {
+                filename: filename.clone(),
+                content: "hello world".to_string(),
+            })
+            .await
+            .expect("write file failed");
+
+        assert!(result.contains(&filename));
+        let content = std::fs::read_to_string(&path).expect("read file");
+        assert_eq!(content, "hello world");
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[tokio::test]
+    async fn write_file_tool_rejects_bad_extension() {
+        let tool = WriteFileTool::new();
+        let result = tool
+            .call(WriteFileArgs {
+                filename: "output.bin".to_string(),
+                content: "nope".to_string(),
+            })
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn write_file_tool_rejects_parent_dir() {
+        let tool = WriteFileTool::new();
+        let result = tool
+            .call(WriteFileArgs {
+                filename: "..\\escape.txt".to_string(),
+                content: "blocked".to_string(),
+            })
+            .await;
+
+        assert!(result.is_err());
+    }
+}

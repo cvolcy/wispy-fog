@@ -48,3 +48,57 @@ impl History for JSONLHistory {
         Ok(messages.into_iter().rev().take(count).rev().collect())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{History, JSONLHistory};
+    use rig::message::{AssistantContent, Message};
+    use rig::OneOrMany;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_history_path() -> PathBuf {
+        let mut path = std::env::temp_dir();
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos();
+        path.push(format!("wispy_fog_history_test_{}.jsonl", nanos));
+        path
+    }
+
+    fn assistant_message(text: &str) -> Message {
+        Message::Assistant {
+            id: None,
+            content: OneOrMany::one(AssistantContent::text(text.to_string())),
+        }
+    }
+
+    #[tokio::test]
+    async fn jsonl_history_returns_latest_messages_in_order() -> anyhow::Result<()> {
+        let path = temp_history_path();
+        let history = JSONLHistory::new(&path);
+
+        history.add(assistant_message("first")).await?;
+        history.add(assistant_message("second")).await?;
+        history.add(assistant_message("third")).await?;
+
+        let messages = history.get(2).await?;
+        let serialized: Vec<String> = messages
+            .iter()
+            .map(|message| serde_json::to_string(message).expect("serialize message"))
+            .collect();
+
+        let expected = vec![
+            serde_json::to_string(&assistant_message("second"))
+                .expect("serialize message"),
+            serde_json::to_string(&assistant_message("third"))
+                .expect("serialize message"),
+        ];
+
+        assert_eq!(serialized, expected);
+
+        let _ = tokio::fs::remove_file(&path).await;
+        Ok(())
+    }
+}
