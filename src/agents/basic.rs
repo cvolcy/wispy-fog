@@ -10,7 +10,7 @@ use rig::{
 };
 
 use crate::{
-    agent::history::{History, JSONLHistory},
+    agents::history::{History, JSONLHistory},
     config::{Config, ModelProvider},
     tools::ToolRegistry,
 };

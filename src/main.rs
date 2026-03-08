@@ -8,14 +8,14 @@ use log::{info, debug};
 use std::fs;
 
 use crate::{
-    agent::{basic::BasicAgent, history::JSONLHistory},
+    agents::{basic::BasicAgent, history::JSONLHistory},
     config::{Args, Config},
     tools::{echo::EchoTool, write_file::WriteFileTool, ToolRegistry},
 };
 
-use crate::agent::Agent;
+use crate::agents::Agent;
 
-mod agent;
+mod agents;
 mod config;
 mod tools;
 
