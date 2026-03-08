@@ -5,7 +5,7 @@ use log::{info, debug};
 use crate::{
     agent::{basic::BasicAgent, history::JSONLHistory},
     config::{Args, Config},
-    tools::{EchoTool, WriteFileTool, ToolRegistry},
+    tools::{echo::EchoTool, write_file::WriteFileTool, ToolRegistry},
 };
 
 use crate::agent::Agent;
