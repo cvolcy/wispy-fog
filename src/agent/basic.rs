@@ -1,12 +1,25 @@
+//! Basic agent implementation with conversation history and tool support.
+
 use std::io::{self, Write};
 
 use anyhow::Result;
-use log::{debug, info};
-use rig::{OneOrMany, client::CompletionClient, completion::Chat, message::{AssistantContent, Message}, providers::gemini};
+use log::{debug, info, warn};
+use rig::{
+    completion::Chat, client::CompletionClient, message::{AssistantContent, Message},
+    providers::gemini, OneOrMany,
+};
 
-use crate::{agent::history::{History, JSONLHistory}, config::{Config, ModelProvider}, tools::ToolRegistry};
+use crate::{
+    agent::history::{History, JSONLHistory},
+    config::{Config, ModelProvider},
+    tools::ToolRegistry,
+};
 
-/// A very simple agent that wraps the rig client and maintains a chat history.
+/// A conversational agent that maintains chat history and can use tools.
+///
+/// `BasicAgent` provides a straightforward implementation of an AI agent
+/// that maintains conversation history and can call registered tools.
+/// It supports interactive sessions with configurable context windows.
 pub struct BasicAgent {
     config: Config,
     client: gemini::Client,
@@ -15,7 +28,15 @@ pub struct BasicAgent {
 }
 
 impl BasicAgent {
-    /// Build a new `BasicAgent` from configuration and a pre-populated tool registry.
+    /// Create a new agent with the given configuration and tools.
+    ///
+    /// # Arguments
+    /// * `config` - Agent configuration (model, API key, etc.)
+    /// * `tool_registry` - Registry of tools available to the agent
+    /// * `history_manager` - Manager for conversation history
+    ///
+    /// # Panics
+    /// Panics if the gemini client cannot be initialized.
     pub fn new(config: Config, tool_registry: ToolRegistry, history_manager: JSONLHistory) -> Self {
         let client = match config.provider {
             ModelProvider::Gemini => gemini::Client::new(config.api_key.clone())
@@ -30,33 +51,50 @@ impl BasicAgent {
         }
     }
 
-    /// Internal interactive loop; separated from the `Agent` trait so that it can be
-    /// driven by tests or other callers if necessary.
+    /// Run an interactive chat session.
+    ///
+    /// This method drives the agent's main interaction loop, handling user input,
+    /// sending prompts to the model, and maintaining conversation history.
     async fn interact(&mut self) -> Result<()> {
         info!("beginning interactive session");
 
-        let model = self
-            .client
-            .agent(self.config.model.clone())
-            .tools(self.tool_registry.tools())
-            .build();
-        
         loop {
             let chat_history: Vec<Message> = self.history_manager.get(15).await?;
+            debug!("loaded {} messages from history", chat_history.len());
+
             let input = read_line("prompt: ")?;
             let input = input.trim();
+
             if input.eq_ignore_ascii_case("exit") {
                 info!("received exit command, shutting down");
                 break;
             }
 
+            if input.is_empty() {
+                debug!("skipping empty input");
+                continue;
+            }
+
             debug!("sending message to model: {}", input);
-            let response = model.chat(input, chat_history.clone()).await?;
+            let model = self
+                .client
+                .agent(self.config.model.clone())
+                .tools(self.tool_registry.tools())
+                .build();
+
+            let response = match model.chat(input, chat_history.clone()).await {
+                Ok(response) => response,
+                Err(e) => {
+                    warn!("model error: {}", e);
+                    eprintln!("Error: Failed to get response from model");
+                    continue;
+                }
+            };
+
             println!("Response: {}", response);
 
-            // keep history so subsequent turns can see the conversation
             self.history_manager.add(input.into()).await?;
-            self.history_manager.add( Message::Assistant {
+            self.history_manager.add(Message::Assistant {
                 id: None,
                 content: OneOrMany::one(AssistantContent::text(response)),
             }).await?;
@@ -73,7 +111,14 @@ impl super::Agent for BasicAgent {
     }
 }
 
-pub fn read_line(prompt: &str) -> io::Result<String> {
+/// Read a line of input from stdin with a prompt.
+///
+/// # Arguments
+/// * `prompt` - The prompt string to display
+///
+/// # Returns
+/// The user's input as a String, or an IO error
+fn read_line(prompt: &str) -> io::Result<String> {
     print!("{}", prompt);
     io::stdout().flush()?;
     let mut buf = String::new();

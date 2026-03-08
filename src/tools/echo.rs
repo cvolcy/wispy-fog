@@ -1,29 +1,45 @@
+//! Echo tool - a simple demonstration tool that echoes back input.
+
 use rig::{completion::ToolDefinition, tool::Tool};
 use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::fmt;
 
-#[derive(Debug)]
+/// Error type for the echo tool.
+#[derive(Debug, Clone)]
 pub struct EchoError;
 
-impl std::fmt::Display for EchoError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Echo tool error")
+impl fmt::Display for EchoError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "echo tool encountered an error")
     }
 }
 
-impl std::error::Error for EchoError {}
+impl Error for EchoError {}
 
+/// Arguments for the echo tool.
 #[derive(Serialize, Deserialize, schemars::JsonSchema)]
 pub struct EchoArgs {
+    /// The message to echo back.
     pub message: String,
 }
 
-/// A simple echo tool that returns its input
-#[derive(Serialize, Deserialize, Clone)]
+/// A simple demonstration tool that echoes back the input message.
+///
+/// # Example
+/// ```ignore
+/// let tool = EchoTool::new();
+/// let args = EchoArgs { message: "hello".to_string() };
+/// let result = tool.call(args).await;
+/// assert_eq!(result, Ok("Echo: hello".to_string()));
+/// ```
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct EchoTool;
 
 impl EchoTool {
+    /// Create a new echo tool instance.
     pub fn new() -> Self {
-        EchoTool
+        Self::default()
     }
 }
 
@@ -37,9 +53,10 @@ impl Tool for EchoTool {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         let parameters = schemars::schema_for!(EchoArgs);
         ToolDefinition {
-            name: "echo".to_string(),
-            description: "A simple tool that echoes back the input".to_string(),
-            parameters: serde_json::to_value(parameters).unwrap(),
+            name: Self::NAME.to_string(),
+            description: "A demonstration tool that echoes back the input message".to_string(),
+            parameters: serde_json::to_value(parameters)
+                .expect("failed to serialize echo tool schema"),
         }
     }
 
