@@ -4,18 +4,19 @@ use anyhow::Result;
 use log::{debug, info};
 use rig::{OneOrMany, client::CompletionClient, completion::Chat, message::{AssistantContent, Message}, providers::gemini};
 
-use crate::{agent::history::{History, JSONLHistory}, config::{Config, ModelProvider}};
+use crate::{agent::history::{History, JSONLHistory}, config::{Config, ModelProvider}, tools::ToolRegistry};
 
 /// A very simple agent that wraps the rig client and maintains a chat history.
 pub struct BasicAgent {
     config: Config,
     client: gemini::Client,
+    tool_registry: ToolRegistry,
     history_manager: JSONLHistory,
 }
 
 impl BasicAgent {
     /// Build a new `BasicAgent` from configuration and a pre-populated tool registry.
-    pub fn new(config: Config, history_manager: JSONLHistory) -> Self {
+    pub fn new(config: Config, tool_registry: ToolRegistry, history_manager: JSONLHistory) -> Self {
         let client = match config.provider {
             ModelProvider::Gemini => gemini::Client::new(config.api_key.clone())
                 .expect("failed to create gemini client"),
@@ -24,6 +25,7 @@ impl BasicAgent {
         BasicAgent {
             config,
             client,
+            tool_registry,
             history_manager,
         }
     }

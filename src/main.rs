@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let history_manager = JSONLHistory::new(format!("{}/history.jsonl", config.output_dir));
-    let mut agent = BasicAgent::new(config, history_manager);
+    let mut agent = BasicAgent::new(config, registry, history_manager);
     agent.run().await?;
 
     Ok(())
