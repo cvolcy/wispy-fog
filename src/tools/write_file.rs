@@ -160,7 +160,7 @@ mod tests {
         let tool = WriteFileTool::new();
         let result = tool
             .call(WriteFileArgs {
-                filename: "output.bin".to_string(),
+                filename: ["..", "output", "tests", "output.bin"].join(std::path::MAIN_SEPARATOR.to_string().as_str()),
                 content: "nope".to_string(),
             })
             .await;
@@ -173,7 +173,7 @@ mod tests {
         let tool = WriteFileTool::new();
         let result = tool
             .call(WriteFileArgs {
-                filename: "..\\escape.txt".to_string(),
+                filename: ["..", "output", "tests", "escape.txt"].join(std::path::MAIN_SEPARATOR.to_string().as_str()),
                 content: "blocked".to_string(),
             })
             .await;
