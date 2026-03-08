@@ -5,7 +5,7 @@ use log::{info, debug};
 use crate::{
     agent::{basic::BasicAgent, history::JSONLHistory},
     config::{Args, Config},
-    tools::{EchoTool, ToolRegistry},
+    tools::{EchoTool, WriteFileTool, ToolRegistry},
 };
 
 use crate::agent::Agent;
@@ -16,7 +16,6 @@ mod tools;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // initialize logger before anything else so early messages are captured
     env_logger::init();
 
     dotenv::dotenv().ok();
@@ -30,9 +29,11 @@ async fn main() -> anyhow::Result<()> {
 
     let mut registry = ToolRegistry::new();
     registry.register_tool(EchoTool::new());
+    registry.register_tool(WriteFileTool::new());
 
-    for tool in registry.tools() {
-        info!("registered tool: {} - {}", tool.name(), tool.description());
+    let tools = registry.tools();
+    for tool in &tools {
+        info!("registered tool: {}", tool.name());
     }
 
     let history_manager = JSONLHistory::new(format!("{}/history.jsonl", config.output_dir));

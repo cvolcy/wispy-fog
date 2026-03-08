@@ -38,6 +38,7 @@ impl BasicAgent {
         let model = self
             .client
             .agent(self.config.model.clone())
+            .tools(self.tool_registry.tools())
             .build();
         
         loop {
