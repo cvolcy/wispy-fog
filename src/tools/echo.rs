@@ -1,5 +1,4 @@
 //! Echo tool - a simple demonstration tool that echoes back input.
-
 use rig::{completion::ToolDefinition, tool::Tool};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
