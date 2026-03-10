@@ -4,7 +4,7 @@ use rig::{completion::ToolDefinition, tool::Tool};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Error type for file writing operations.
 #[derive(Debug, Clone)]
@@ -54,12 +54,16 @@ pub struct WriteFileArgs {
 /// let result = tool.call(args).await;
 /// ```
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct WriteFileTool;
+pub struct WriteFileTool {
+    base_path: PathBuf
+}
 
 impl WriteFileTool {
     /// Create a new write file tool instance.
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(base_path: &Path) -> Self {
+        Self {
+            base_path: base_path.to_path_buf(),
+        }
     }
 
     /// Validate if a filename has an allowed extension.
@@ -99,7 +103,7 @@ impl Tool for WriteFileTool {
         }
 
         // Validate that the path doesn't escape the intended directory
-        let path = Path::new(&args.filename);
+        let path = self.base_path.join(&args.filename);
         if path
             .components()
             .any(|c| matches!(c, std::path::Component::ParentDir))
@@ -110,7 +114,7 @@ impl Tool for WriteFileTool {
         }
 
         // Write to file
-        std::fs::write(&args.filename, &args.content)
+        std::fs::write(path, &args.content)
             .map_err(|e| WriteFileError::new(e.to_string()))?;
 
         Ok(format!("successfully wrote to file: {}", args.filename))
@@ -121,7 +125,7 @@ impl Tool for WriteFileTool {
 mod tests {
     use super::{WriteFileArgs, WriteFileTool};
     use rig::tool::Tool;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_text_path() -> PathBuf {
@@ -136,7 +140,7 @@ mod tests {
 
     #[tokio::test]
     async fn write_file_tool_writes_content() {
-        let tool = WriteFileTool::new();
+        let tool = WriteFileTool::new(Path::new("./"));
         let path = temp_text_path();
         let filename = path.to_string_lossy().to_string();
 
@@ -157,7 +161,7 @@ mod tests {
 
     #[tokio::test]
     async fn write_file_tool_rejects_bad_extension() {
-        let tool = WriteFileTool::new();
+        let tool = WriteFileTool::new(Path::new("./"));
         let result = tool
             .call(WriteFileArgs {
                 filename: ["..", "output", "tests", "output.bin"].join(std::path::MAIN_SEPARATOR.to_string().as_str()),
@@ -170,7 +174,7 @@ mod tests {
 
     #[tokio::test]
     async fn write_file_tool_rejects_parent_dir() {
-        let tool = WriteFileTool::new();
+        let tool = WriteFileTool::new(Path::new("./"));
         let result = tool
             .call(WriteFileArgs {
                 filename: ["..", "output", "tests", "escape.txt"].join(std::path::MAIN_SEPARATOR.to_string().as_str()),

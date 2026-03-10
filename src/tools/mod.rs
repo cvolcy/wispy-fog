@@ -97,6 +97,8 @@ impl ToolRegistry {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::ToolRegistry;
     use crate::tools::{echo::EchoTool, write_file::WriteFileTool};
 
@@ -106,7 +108,7 @@ mod tests {
         assert_eq!(registry.len(), 0);
 
         registry.register_tool(EchoTool::new());
-        registry.register_tool(WriteFileTool::new());
+        registry.register_tool(WriteFileTool::new(Path::new("./")));
 
         assert_eq!(registry.len(), 2);
         assert_eq!(registry.tools().len(), 2);

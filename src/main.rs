@@ -23,9 +23,9 @@ async fn initialize_tools(config: &Config) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
 
     registry.register_tool(EchoTool::new());
-    registry.register_tool(WriteFileTool::new());
     let output_dir = &config.output_dir.clone();
     let base_path = std::path::Path::new(output_dir);
+    registry.register_tool(WriteFileTool::new(base_path));
     let skill_dir = base_path.join("skills");
     let _ = registry.load_skills_from_dir(skill_dir.to_str().unwrap_or("skills")).await;
 
