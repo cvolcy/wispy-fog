@@ -3,11 +3,14 @@
 //! This module provides the infrastructure for registering and managing tools
 //! that can be used by agents. Tools must implement the `rig::tool::Tool` trait.
 
+use crate::tools::skillmd::SkillMD;
 use log::debug;
 use rig::tool::Tool;
+use tokio::fs;
 
 pub mod echo;
 pub mod write_file;
+pub mod skillmd;
 
 /// Internal trait to enable storing heterogeneous tool types in a single collection.
 ///
@@ -55,6 +58,28 @@ impl ToolRegistry {
     pub fn register_tool<T: Tool + Clone + Send + Sync + 'static>(&mut self, tool: T) {
         debug!("registering tool: {}", T::NAME);
         self.tools.push(Box::new(tool));
+    }
+
+    pub async fn load_skills_from_dir(&mut self, dir_path: &str) -> anyhow::Result<(), anyhow::Error> {
+        let path = std::path::Path::new(dir_path);
+        if !path.is_dir() {
+            return Ok(());
+        }
+
+        while let Ok(entry) = fs::read_dir(path).await?.next_entry().await {
+            let entry= entry.ok_or_else(|| anyhow::anyhow!("failed to read directory entry"))?;
+            let path = entry.path();
+            
+            if path.extension().and_then(|s| s.to_str()) == Some("md") {
+                debug!("loading skill from file: {}", path.display());
+                match SkillMD::from_file(&path) {
+                    Ok(skill) => self.register_tool(skill),
+                    Err(e) => debug!("failed to load skill from {}: {}", path.display(), e),
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Get all registered tools as dynamic trait objects.

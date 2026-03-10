@@ -22,3 +22,4 @@ dotenv = "0.15"
 clap = { version = "4.4", features = ["derive"] }
 rig-core = { version = "0.32.0", features = ["derive"] }
 schemars = "1.2.1"
+serde_yaml = "0.9.34"
