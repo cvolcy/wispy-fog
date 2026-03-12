@@ -1,13 +1,28 @@
-use serde::{Deserialize};
-use rig::{completion::ToolDefinition, tool::Tool};
+use log::{debug, error};
+use serde::{Deserialize, Serialize};
+use rig::{client::{CompletionClient, ProviderClient}, completion::{Prompt, ToolDefinition}, tool::Tool};
 use core::fmt;
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
+
+#[derive(Serialize, Deserialize, schemars::JsonSchema)]
+pub struct SkillMDArgs {}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct SkillMDMetadata {
     pub name: String,
     pub description: String,
-    pub parameters: serde_json::Value,
+    pub metadata: Option<ToolMetadata>,
+}
+#[derive(Debug, Deserialize, Clone)]
+pub struct ToolMetadata {
+    pub parameters: Option<HashMap<String, ParameterDefinition>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ParameterDefinition {
+    #[serde(rename = "type")]
+    param_type: String,
+    description: String,
 }
 
 #[derive(Debug, Clone)]
@@ -24,7 +39,7 @@ impl Error for SkillMDError {}
 #[derive(Clone)]
 pub struct SkillMD {
     pub metadata: SkillMDMetadata,
-    pub inscriptions: String
+    pub instructions: String
 }
 
 impl SkillMD {
@@ -36,15 +51,15 @@ impl SkillMD {
             return Err(anyhow::anyhow!("invalid skillmd format: missing frontmatter"));
         }
 
-        let yaml_str = parts[1];
-        let inscriptions = parts[2].trim().to_string();
+        let yaml_str = parts[1].trim();
+        let instructions = parts[2].trim().to_string();
 
         let metadata: SkillMDMetadata = serde_yaml::from_str(yaml_str)
             .map_err(|e| anyhow::anyhow!("failed to parse skillmd frontmatter: {}", e))?;
 
         Ok(Self {
             metadata,
-            inscriptions
+            instructions
         })
     }
 }
@@ -53,22 +68,47 @@ impl Tool for SkillMD {
     const NAME: &'static str = "skillmd";
 
     type Error = SkillMDError;
-    type Args = ();
+    type Args = serde_json::Value;
     type Output = String;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: self.metadata.name.clone(),
             description: self.metadata.description.clone(),
-            parameters: self.metadata.parameters.clone(),
+            parameters: match &self.metadata.metadata {
+                Some(metadata) => match &metadata.parameters {
+                    Some(params) => serde_json::json!({
+                        "type": "object",
+                        "properties": params
+                    }),
+                    None => serde_json::json!(schemars::schema_for!(SkillMDArgs)),
+                },
+                None => serde_json::json!(schemars::schema_for!(SkillMDArgs)),
+            },
         }
     }
 
+    fn name(&self) -> String {
+        self.metadata.name.clone()
+    }
+
     async fn call(&self, _args: Self::Args) -> Result<Self::Output, Self::Error> {
-        Ok(format!(
-            "Executed {} with logic: {}", 
-            self.metadata.name, 
-            self.inscriptions
-        ))
+        let client = rig::providers::gemini::Client::from_env();
+
+        let sub_agent = client
+            .agent("gemini-3.1-flash-lite-preview")
+            .preamble(&self.instructions)
+            .build();
+
+        debug!("executing skill: {} with args: {}", self.metadata.name, _args);
+        let response = sub_agent
+            .prompt(format!("Input parameters: {}", _args))
+            .await
+            .map_err(|e| {
+                error!("Sub-agent error: {}", e);
+                SkillMDError
+            })?;
+
+        Ok(response)
     }
 }
