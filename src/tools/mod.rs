@@ -65,16 +65,19 @@ impl ToolRegistry {
         if !path.is_dir() {
             return Ok(());
         }
-
-        while let Ok(entry) = fs::read_dir(path).await?.next_entry().await {
+        let mut entries = fs::read_dir(path).await?;
+        while let Ok(entry) = entries.next_entry().await {
             let entry= entry.ok_or_else(|| anyhow::anyhow!("failed to read directory entry"))?;
             let path = entry.path();
             
-            if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                debug!("loading skill from file: {}", path.display());
-                match SkillMD::from_file(&path) {
-                    Ok(skill) => self.register_tool(skill),
-                    Err(e) => debug!("failed to load skill from {}: {}", path.display(), e),
+            if path.is_dir() {
+                let skill_file_path = path.join("SKILL.md");
+                if skill_file_path.exists() {
+                    debug!("loading skill from file: {}", path.display());
+                    match SkillMD::from_file(&skill_file_path) {
+                        Ok(skill) => self.register_tool(skill),
+                        Err(e) => debug!("failed to load skill from {}: {}", path.display(), e),
+                    }
                 }
             }
         }
