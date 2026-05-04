@@ -1,4 +1,4 @@
-//! File writing tool - enables agents to write content to text files.
+//! Terminal tool - enables agents to execute commands in the terminal.
 
 use log::debug;
 use rig::{completion::ToolDefinition, tool::Tool};
@@ -8,13 +8,13 @@ use std::error::Error;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-/// Error type for file writing operations.
+/// Error type for terminal operations.
 #[derive(Debug, Clone)]
 pub struct TerminalError(String);
 
 impl fmt::Display for TerminalError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "file operation failed: {}", self.0)
+        write!(f, "command execution failed: {}", self.0)
     }
 }
 
@@ -54,7 +54,7 @@ pub struct TerminalTool {
 }
 
 impl TerminalTool {
-    /// Create a new write file tool instance.
+    /// Create a new terminal tool instance.
     pub fn new(base_path: &Path) -> Self {
         Self {
             base_path: base_path.to_path_buf(),
@@ -77,7 +77,7 @@ impl Tool for TerminalTool {
                 "Give access to a shell terminal from the docker image curlimages/curl."
             ),
             parameters: serde_json::to_value(parameters)
-                .expect("failed to serialize terminal tool schema"),
+                .unwrap(),
         }
     }
 

@@ -89,7 +89,7 @@ impl Tool for WriteFileTool {
                 ALLOWED_EXTENSIONS.join(", ")
             ),
             parameters: serde_json::to_value(parameters)
-                .expect("failed to serialize write_file tool schema"),
+                .unwrap(),
         }
     }
 

@@ -1,4 +1,4 @@
-//! File writing tool - enables agents to write content to text files.
+//! File reading tool - enables agents to read content from text files.
 
 use log::debug;
 use rig::{completion::ToolDefinition, tool::Tool};
@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use std::error::Error;
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
-/// Error type for file writing operations.
+/// Error type for file reading operations.
 #[derive(Debug, Clone)]
 pub struct ReadFileError(String);
 
@@ -54,7 +54,7 @@ pub struct ReadFileTool {
 }
 
 impl ReadFileTool {
-    /// Create a new write file tool instance.
+    /// Create a new read file tool instance.
     pub fn new(base_path: &Path) -> Self {
         Self {
             base_path: base_path.to_path_buf(),
@@ -77,11 +77,21 @@ impl Tool for ReadFileTool {
                 "Read text content from a file."
             ),
             parameters: serde_json::to_value(parameters)
-                .expect("failed to serialize read_file tool schema"),
+                .unwrap(),
         }
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        // Validate that the path doesn't escape the intended directory
+        if Path::new(&args.filename)
+            .components()
+            .any(|c| matches!(c, Component::ParentDir))
+        {
+            return Err(ReadFileError::new(
+                "path traversal attacks are not allowed",
+            ));
+        }
+
         // 1. Define the sandbox image (e.g., alpine for speed or python:3.9-slim for tools)
         let image = "alpine:latest";
         
@@ -94,7 +104,7 @@ impl Tool for ReadFileTool {
                 "-v", "./output:/workspace", // Mount local ./sandbox to /workspace
                 "-w", "/workspace",           // Set working directory inside container
                 image, 
-                "sh", "-c", "cat", &args.filename     // Run the agent's command
+                "sh", "-c", &format!("cat {}", &args.filename)     // Run the agent's command
             ])
             .output()
             .await;

@@ -46,18 +46,21 @@ impl BasicAgent {
     /// * `tool_registry` - Registry of tools available to the agent
     /// * `history_manager` - Manager for conversation history
     ///
-    /// # Panics
-    /// Panics if the gemini client cannot be initialized.
-    pub fn new(config: Config, tool_registry: ToolRegistry, history_manager: JSONLHistory) -> Self {
+    /// # Errors
+    /// Returns an error if the client cannot be initialized.
+    pub fn new(config: Config, tool_registry: ToolRegistry, history_manager: JSONLHistory) -> Result<Self> {
         let agent: ProviderAgent = match config.provider {
-            ModelProvider::Gemini => ProviderAgent::Gemini(
-                gemini::Client::new(config.api_key.clone())
-                    .expect("failed to create gemini client")
-                    .agent(config.model.clone())
-                    .tools(tool_registry.tools())
-                    .default_max_turns(20)
-                    .build()
-            ),
+            ModelProvider::Gemini => {
+                let client = gemini::Client::new(config.api_key.clone())
+                    .map_err(|e| anyhow::anyhow!("failed to create gemini client: {}", e))?;
+                ProviderAgent::Gemini(
+                    client
+                        .agent(config.model.clone())
+                        .tools(tool_registry.tools())
+                        .default_max_turns(20)
+                        .build()
+                )
+            },
             ModelProvider::Ollama => ProviderAgent::Ollama(
                 ollama::Client::from_env()
                     .agent(config.model.clone())
@@ -67,10 +70,10 @@ impl BasicAgent {
             ),
         };
 
-        BasicAgent {
+        Ok(BasicAgent {
             agent,
             history_manager,
-        }
+        })
     }
 
     /// Run an interactive chat session.
@@ -102,7 +105,7 @@ impl BasicAgent {
                 Ok(response) => response,
                 Err(e) => {
                     warn!("model error: {}", e);
-                    eprintln!("Error: Failed to get response from model");
+                    eprintln!("Error: {}", e);
                     continue;
                 }
             };

@@ -23,7 +23,7 @@ async fn initialize_tools(config: &Config) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
 
     registry.register_tool(EchoTool::new());
-    let output_dir = &config.output_dir.clone();
+    let output_dir = &config.output_dir;
     let base_path = std::path::Path::new(output_dir);
     registry.register_tool(WriteFileTool::new(base_path));
     registry.register_tool(ReadFileTool::new(base_path));
@@ -78,7 +78,7 @@ async fn main() -> anyhow::Result<()> {
     let history_manager = JSONLHistory::new(history_path);
     debug!("initialized history manager");
 
-    let mut agent = BasicAgent::new(config, registry, history_manager);
+    let mut agent = BasicAgent::new(config, registry, history_manager)?;
     agent.run().await?;
 
     info!("shutdown complete");

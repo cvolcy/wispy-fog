@@ -55,7 +55,7 @@ impl Tool for EchoTool {
             name: Self::NAME.to_string(),
             description: "A demonstration tool that echoes back the input message".to_string(),
             parameters: serde_json::to_value(parameters)
-                .expect("failed to serialize echo tool schema"),
+                .unwrap(),
         }
     }
 
