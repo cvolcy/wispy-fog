@@ -8,22 +8,31 @@ use log::{info, debug};
 use std::fs;
 
 use crate::{
-    agent::{basic::BasicAgent, history::JSONLHistory},
+    agents::{basic::BasicAgent, history::JSONLHistory},
     config::{Args, Config},
-    tools::{echo::EchoTool, write_file::WriteFileTool, ToolRegistry},
+    tools::{ToolRegistry, echo::EchoTool, read_file::ReadFileTool, terminal::TerminalTool, write_file::WriteFileTool},
 };
 
-use crate::agent::Agent;
+use crate::agents::Agent;
 
-mod agent;
+mod agents;
 mod config;
 mod tools;
 
-fn initialize_tools() -> ToolRegistry {
+async fn initialize_tools(config: &Config) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
 
     registry.register_tool(EchoTool::new());
-    registry.register_tool(WriteFileTool::new());
+    let output_dir = &config.output_dir;
+    let base_path = std::path::Path::new(output_dir);
+    registry.register_tool(WriteFileTool::new(base_path));
+    registry.register_tool(ReadFileTool::new(base_path));
+    registry.register_tool(TerminalTool::new(base_path));
+    let skill_dir = base_path.join("skills");
+    let _ = registry.load_skills_from_dir(
+        skill_dir.to_str().unwrap_or("skills"),
+        config.clone()
+    ).await;
 
     debug!("initialized tool registry with {} tools", registry.len());
     registry
@@ -62,14 +71,14 @@ async fn main() -> anyhow::Result<()> {
 
     ensure_output_dir(&config.output_dir)?;
 
-    let registry = initialize_tools();
+    let registry = initialize_tools(&config).await;
     log_registered_tools(&registry);
 
     let history_path = format!("{}/history.jsonl", config.output_dir);
     let history_manager = JSONLHistory::new(history_path);
     debug!("initialized history manager");
 
-    let mut agent = BasicAgent::new(config, registry, history_manager);
+    let mut agent = BasicAgent::new(config, registry, history_manager)?;
     agent.run().await?;
 
     info!("shutdown complete");

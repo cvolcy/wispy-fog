@@ -1,5 +1,4 @@
 //! Echo tool - a simple demonstration tool that echoes back input.
-
 use rig::{completion::ToolDefinition, tool::Tool};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -56,11 +55,30 @@ impl Tool for EchoTool {
             name: Self::NAME.to_string(),
             description: "A demonstration tool that echoes back the input message".to_string(),
             parameters: serde_json::to_value(parameters)
-                .expect("failed to serialize echo tool schema"),
+                .unwrap(),
         }
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         Ok(format!("Echo: {}", args.message))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EchoArgs, EchoTool};
+    use rig::tool::Tool;
+
+    #[tokio::test]
+    async fn echo_tool_returns_prefixed_message() {
+        let tool = EchoTool::new();
+        let result = tool
+            .call(EchoArgs {
+                message: "hello".to_string(),
+            })
+            .await
+            .expect("echo tool failed");
+
+        assert_eq!(result, "Echo: hello");
     }
 }
