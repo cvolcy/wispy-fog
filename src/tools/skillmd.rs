@@ -4,6 +4,8 @@ use rig::{client::{CompletionClient, ProviderClient}, completion::{Prompt, ToolD
 use core::fmt;
 use std::{collections::HashMap, error::Error};
 
+use crate::config::Config;
+
 #[derive(Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SkillMDArgs {}
 
@@ -39,11 +41,12 @@ impl Error for SkillMDError {}
 #[derive(Clone)]
 pub struct SkillMD {
     pub metadata: SkillMDMetadata,
-    pub instructions: String
+    pub instructions: String,
+    config: Config,
 }
 
 impl SkillMD {
-    pub fn from_file(path: &std::path::Path) -> anyhow::Result<Self> {
+    pub fn from_file(path: &std::path::Path, config: Config) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)?;
 
         let parts: Vec<&str> = content.splitn(3, "---").collect();
@@ -59,7 +62,8 @@ impl SkillMD {
 
         Ok(Self {
             metadata,
-            instructions
+            instructions,
+            config
         })
     }
 }
@@ -93,10 +97,10 @@ impl Tool for SkillMD {
     }
 
     async fn call(&self, _args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let client = rig::providers::gemini::Client::from_env();
+        let client = rig::providers::ollama::Client::from_env();
 
         let sub_agent = client
-            .agent("gemini-3.1-flash-lite-preview")
+            .agent(self.config.model.clone())
             .preamble(&self.instructions)
             .build();
 

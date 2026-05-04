@@ -5,8 +5,7 @@ use std::io::{self, Write};
 use anyhow::Result;
 use log::{debug, info, warn};
 use rig::{
-    completion::Chat, client::CompletionClient, message::{AssistantContent, Message},
-    providers::gemini, OneOrMany,
+    OneOrMany, agent::Agent, client::{CompletionClient, ProviderClient}, completion::{Chat, PromptError}, message::{AssistantContent, Message}, providers::{gemini, ollama}
 };
 
 use crate::{
@@ -21,10 +20,22 @@ use crate::{
 /// that maintains conversation history and can call registered tools.
 /// It supports interactive sessions with configurable context windows.
 pub struct BasicAgent {
-    config: Config,
-    client: gemini::Client,
-    tool_registry: ToolRegistry,
+    agent: ProviderAgent,
     history_manager: JSONLHistory,
+}
+
+enum ProviderAgent {
+    Gemini(Agent<gemini::CompletionModel>),
+    Ollama(Agent<ollama::CompletionModel>),
+}
+
+impl ProviderAgent {
+    pub async fn chat(&self, input: &str, history: Vec<Message>) -> Result<String, PromptError>{
+        match self {
+            ProviderAgent::Gemini(agent) => agent.chat(input, history).await,
+            ProviderAgent::Ollama(agent) => agent.chat(input, history).await,
+        }
+    }
 }
 
 impl BasicAgent {
@@ -38,15 +49,26 @@ impl BasicAgent {
     /// # Panics
     /// Panics if the gemini client cannot be initialized.
     pub fn new(config: Config, tool_registry: ToolRegistry, history_manager: JSONLHistory) -> Self {
-        let client = match config.provider {
-            ModelProvider::Gemini => gemini::Client::new(config.api_key.clone())
-                .expect("failed to create gemini client"),
+        let agent: ProviderAgent = match config.provider {
+            ModelProvider::Gemini => ProviderAgent::Gemini(
+                gemini::Client::new(config.api_key.clone())
+                    .expect("failed to create gemini client")
+                    .agent(config.model.clone())
+                    .tools(tool_registry.tools())
+                    .default_max_turns(20)
+                    .build()
+            ),
+            ModelProvider::Ollama => ProviderAgent::Ollama(
+                ollama::Client::from_env()
+                    .agent(config.model.clone())
+                    .tools(tool_registry.tools())
+                    .default_max_turns(20)
+                    .build()
+            ),
         };
 
         BasicAgent {
-            config,
-            client,
-            tool_registry,
+            agent,
             history_manager,
         }
     }
@@ -76,13 +98,7 @@ impl BasicAgent {
             }
 
             debug!("sending message to model: {}", input);
-            let model = self
-                .client
-                .agent(self.config.model.clone())
-                .tools(self.tool_registry.tools())
-                .build();
-
-            let response = match model.chat(input, chat_history.clone()).await {
+            let response = match self.agent.chat(input, chat_history.clone()).await {
                 Ok(response) => response,
                 Err(e) => {
                     warn!("model error: {}", e);

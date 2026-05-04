@@ -53,6 +53,7 @@ pub struct Config {
 #[derive(Debug, Clone)]
 pub enum ModelProvider {
     Gemini,
+    Ollama
     // future providers can be added here
 }
 
@@ -87,6 +88,7 @@ impl Config {
         if let Some(provider) = args.provider {
             cfg.provider = match provider.as_str() {
                 "gemini" => ModelProvider::Gemini,
+                "ollama" => ModelProvider::Ollama,
                 other => {
                     log::warn!("unknown provider '{}', defaulting to Gemini", other);
                     ModelProvider::Gemini
@@ -116,6 +118,7 @@ impl Config {
             // try environment variable fallback
             let env_var = match cfg.provider {
                 ModelProvider::Gemini => "GEMINI_API_KEY",
+                ModelProvider::Ollama => "OLLAMA_API_BASE_URL", // Ollama doesn't use an API key, but we can allow setting the base URL via env
             };
             if let Ok(env_key) = env::var(env_var) {
                 cfg.api_key = env_key;

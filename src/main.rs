@@ -10,7 +10,7 @@ use std::fs;
 use crate::{
     agents::{basic::BasicAgent, history::JSONLHistory},
     config::{Args, Config},
-    tools::{echo::EchoTool, write_file::WriteFileTool, ToolRegistry},
+    tools::{ToolRegistry, echo::EchoTool, read_file::ReadFileTool, terminal::TerminalTool, write_file::WriteFileTool},
 };
 
 use crate::agents::Agent;
@@ -26,8 +26,13 @@ async fn initialize_tools(config: &Config) -> ToolRegistry {
     let output_dir = &config.output_dir.clone();
     let base_path = std::path::Path::new(output_dir);
     registry.register_tool(WriteFileTool::new(base_path));
+    registry.register_tool(ReadFileTool::new(base_path));
+    registry.register_tool(TerminalTool::new(base_path));
     let skill_dir = base_path.join("skills");
-    let _ = registry.load_skills_from_dir(skill_dir.to_str().unwrap_or("skills")).await;
+    let _ = registry.load_skills_from_dir(
+        skill_dir.to_str().unwrap_or("skills"),
+        config.clone()
+    ).await;
 
     debug!("initialized tool registry with {} tools", registry.len());
     registry
