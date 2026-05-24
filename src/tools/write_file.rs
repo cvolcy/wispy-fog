@@ -2,6 +2,7 @@
 
 use rig::{completion::ToolDefinition, tool::Tool};
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 use std::error::Error;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -113,8 +114,9 @@ impl Tool for WriteFileTool {
             ));
         }
 
-        // Write to file
-        std::fs::write(path, &args.content)
+        // Write to file (use async to avoid blocking the runtime)
+        fs::write(&path, &args.content)
+            .await
             .map_err(|e| WriteFileError::new(e.to_string()))?;
 
         Ok(format!("successfully wrote to file: {}", args.filename))

@@ -71,13 +71,17 @@ impl Tool for ReadFileTool {
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         let parameters = schemars::schema_for!(ReadFileArgs);
+        let parameters_value = serde_json::to_value(parameters).unwrap_or_else(|e| {
+            log::warn!("schema serialization failed: {}", e);
+            serde_json::Value::Null
+        });
+
         ToolDefinition {
             name: Self::NAME.to_string(),
             description: format!(
                 "Read text content from a file."
             ),
-            parameters: serde_json::to_value(parameters)
-                .unwrap(),
+            parameters: parameters_value,
         }
     }
 
