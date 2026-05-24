@@ -78,9 +78,7 @@ impl Tool for TerminalTool {
 
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: format!(
-                "Give access to a shell terminal from the docker image curlimages/curl."
-            ),
+            description: "Give access to a shell terminal from the docker image curlimages/curl.".into(),
             parameters: parameters_value,
         }
     }

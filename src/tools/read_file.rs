@@ -78,9 +78,7 @@ impl Tool for ReadFileTool {
 
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: format!(
-                "Read text content from a file."
-            ),
+            description: "Read text content from a file.".into(),
             parameters: parameters_value,
         }
     }

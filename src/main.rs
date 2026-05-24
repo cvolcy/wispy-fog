@@ -7,17 +7,13 @@ use clap::Parser;
 use log::{info, debug};
 use std::fs;
 
-use crate::{
+use wispy_fog::{
     agents::{basic::BasicAgent, history::JSONLHistory},
     config::{Args, Config},
     tools::{ToolRegistry, echo::EchoTool, read_file::ReadFileTool, terminal::TerminalTool, write_file::WriteFileTool},
 };
 
-use crate::agents::Agent;
-
-mod agents;
-mod config;
-mod tools;
+use wispy_fog::agents::Agent;
 
 async fn initialize_tools(config: &Config) -> ToolRegistry {
     let mut registry = ToolRegistry::new();

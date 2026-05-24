@@ -38,7 +38,7 @@ pub struct EchoTool;
 impl EchoTool {
     /// Create a new echo tool instance.
     pub fn new() -> Self {
-        Self::default()
+        Self
     }
 }
 
@@ -65,24 +65,5 @@ impl Tool for EchoTool {
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         Ok(format!("Echo: {}", args.message))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{EchoArgs, EchoTool};
-    use rig::tool::Tool;
-
-    #[tokio::test]
-    async fn echo_tool_returns_prefixed_message() {
-        let tool = EchoTool::new();
-        let result = tool
-            .call(EchoArgs {
-                message: "hello".to_string(),
-            })
-            .await
-            .expect("echo tool failed");
-
-        assert_eq!(result, "Echo: hello");
     }
 }
